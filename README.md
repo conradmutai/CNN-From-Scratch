@@ -1,5 +1,5 @@
 # Convolutional Neural Network from Scratch
-Creating a CNN without the usage of core tensor libraries such as **PyTorch** or **TensorFlow**, while mainly utilizing **NumPy**. Implements forward pass, backpropagration, and gradient descent following essential principles.\
+Creating a CNN without the usage of core tensor libraries such as **PyTorch** or **TensorFlow**, while mainly utilizing **NumPy**. Implements forward pass, backpropagration, and gradient descent following essential principles.
 ## What This Is
 
 ## Architecture
