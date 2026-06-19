@@ -1,6 +1,6 @@
 import numpy as np
 
-from .activations import relu
+from .activations import relu, softmax
 
 class Conv2D:
     def __init__(self, weight, bias, pad=1):
@@ -38,17 +38,44 @@ class Conv2D:
         return out
 
     def back(self, image):
-        pass # temporary hold
+        pass  # temporary hold
 
 
-class maxPool:
-    def __init__(self):
+class MaxPool:
+    def forward(self, x_in):
+        x_out = np.zeros((int(np.floor(x_in.shape[0]/2)), int(np.floor(x_in.shape[1]/2))))
 
-    def forward(self):
+        for i in range(x_out.shape[0]):
+            for j in range(x_out.shape[1]):
+                patch = x_in[i * 2:i * 2 + 2, j * 2:j * 2 + 2]
+
+                x_out[i, j] = np.max(patch)
+
+        return x_out
+
+    def backward(self):
+        pass  # temp hold
 
 
+class Flatten:
+    def forward(self, image):
+        self.input_shape = image.shape
+        batch_size = image.shape[0]
 
-def flatten( ):
+        return image.reshape(batch_size, -1)
+
+    def backward(self, grad_output):
+        return grad_output.reshape(self.input_shape)
 
 
-def fullyConnected( ):
+class FullyConnected:
+    def __init__(self, weight, bias):
+        self.weight = weight
+        self.bias = bias
+
+    def forward(self, image):
+        self.input = image
+        return relu(image @ self.weight + self.bias)
+
+    def backward(self):
+        pass  # temp hold
