@@ -1,6 +1,6 @@
 import numpy as np
 
-from .activations import relu, softmax
+from .activations import relu
 
 class Conv2D:
     def __init__(self, weight, bias, pad=1):
@@ -43,21 +43,47 @@ class Conv2D:
 
 class MaxPool:
     def forward(self, x_in):
-        x_out = np.zeros((int(np.floor(x_in.shape[0]/2)), int(np.floor(x_in.shape[1]/2))))
+        batch_size, channels, height_in, width_in = x_in.shape
+        height_out = height_in // 2
+        width_out = width_in // 2
 
-        for i in range(x_out.shape[0]):
-            for j in range(x_out.shape[1]):
-                patch = x_in[i * 2:i * 2 + 2, j * 2:j * 2 + 2]
+        x_out = np.zeros((batch_size, channels, height_out, width_out))
+        self.mask = np.zeros_like(x_in)
+        self.input_shape = x_in.shape
 
-                x_out[i, j] = np.max(patch)
+        for b in range(batch_size):
+            for c in range(channels):
+                for i in range(height_out):  # height
+                    for j in range(width_out):  # width
+                        patch = x_in[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2]
+                        max_val = np.max(patch)
+
+                        x_out[b, c, i, j] = max_val
+
+                        # record where the max came from, within this patch
+                        patch_mask = (patch == max_val)
+                        self.mask[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] = patch_mask
 
         return x_out
 
-    def backward(self):
-        pass  # temp hold
+    def backward(self, loss):
+        loss_out = np.zeros(self.input_shape)
+        batch_size, channels, height_out, width_out = loss.shape
 
+        for b in range(batch_size):
+            for c in range(channels):
+                for i in range(height_out):
+                    for j in range(width_out):
+                        loss_out[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] += (
+                                self.mask[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] * loss[b, c, i, j]
+                        )
+
+        return loss_out
 
 class Flatten:
+    def __init__(self):
+        self.input_shape = None
+
     def forward(self, image):
         self.input_shape = image.shape
         batch_size = image.shape[0]
@@ -70,6 +96,7 @@ class Flatten:
 
 class FullyConnected:
     def __init__(self, weight, bias):
+        self.input = None
         self.weight = weight
         self.bias = bias
 
