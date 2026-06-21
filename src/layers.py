@@ -9,6 +9,7 @@ class Conv2D:
         self.pad = pad
 
     def forward(self, image, stride=1, pad=1):
+        # padding the forward pass
         if self.pad != 0:
             image = np.pad(
                 image,
@@ -16,14 +17,18 @@ class Conv2D:
                 mode='constant'
             )
 
+        # assigns the size of elements in the image and weight matrices to the valid variables
         batch_size, image_height_in, image_width_in = image.shape[0], image.shape[2], image.shape[3]
         channels_out, channels_in, kernel_height, kernel_width = self.weight.shape
 
+        # calculates the appropriate dimensions of the image out
         image_height_out = np.floor(1 + (image_height_in - kernel_height) / stride).astype(int)
         image_width_out = np.floor(1 + (image_width_in - kernel_width) / stride).astype(int)
 
+        # creates empty out matrix for the conv2D
         out = np.zeros(shape=(batch_size, channels_out, image_height_out, image_width_out), dtype=np.float32)
 
+        # iterates through all the elements of the image matrix to calculate the sum of the pixels multiplied by weight
         for y in range(image_height_out):
             for x in range(image_width_out):
                 for y_kernel in range(kernel_height):
@@ -45,22 +50,29 @@ class MaxPool:
         self.mask = None
 
     def forward(self, x_in):
+        # assigns the dimension shapes to the appropriate variables
         batch_size, channels, height_in, width_in = x_in.shape
+
+        # calculates the height out and width out
         height_out = height_in // 2
         width_out = width_in // 2
 
+        # creates a null matrix to store the values post maxpooling
         x_out = np.zeros((batch_size, channels, height_out, width_out))
+
+        # updates the mask and input shape
         self.mask = np.zeros_like(x_in)
         self.input_shape = x_in.shape
 
+        # iterates through all the values in the input matrix
         for b in range(batch_size):
             for c in range(channels):
                 for i in range(height_out):  # height
                     for j in range(width_out):  # width
-                        patch = x_in[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2]
-                        max_val = np.max(patch)
+                        patch = x_in[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2]  # gets the patch from the image
+                        max_val = np.max(patch)  # gets the max from each quarter
 
-                        x_out[b, c, i, j] = max_val
+                        x_out[b, c, i, j] = max_val  # assigns the max value to the out matrix
 
                         # record where the max came from, within this patch
                         patch_mask = (patch == max_val)
@@ -69,6 +81,7 @@ class MaxPool:
         return x_out
 
     def backward(self, loss):
+        # creates a loss out matrix and once again assigns the sizes of the loss shape to the appropriate variables
         loss_out = np.zeros(self.input_shape)
         batch_size, channels, height_out, width_out = loss.shape
 
@@ -78,7 +91,7 @@ class MaxPool:
                     for j in range(width_out):
                         loss_out[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] += (
                                 self.mask[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] * loss[b, c, i, j]
-                        )
+                        ) # sets the loss out matrix max from the mask values obtained
 
         return loss_out
 
@@ -87,6 +100,7 @@ class Flatten:
     def __init__(self):
         self.input_shape = None
 
+    # created to flatten a matrix into a 1 dimensional shape
     def forward(self, image):
         self.input_shape = image.shape
         batch_size = image.shape[0]
