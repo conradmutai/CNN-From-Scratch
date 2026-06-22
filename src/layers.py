@@ -2,10 +2,12 @@ import numpy as np
 
 from .activations import relu
 
+
 class Conv2D:
-    def __init__(self, weight, bias, pad=1):
+    def __init__(self, weight, bias, input, pad=1):
         self.weight = weight
         self.bias = bias
+        self.input = input
         self.pad = pad
 
     def forward(self, image, stride=1, pad=1):
@@ -29,20 +31,61 @@ class Conv2D:
         out = np.zeros(shape=(batch_size, channels_out, image_height_out, image_width_out), dtype=np.float32)
 
         # iterates through all the elements of the image matrix to calculate the sum of the pixels multiplied by weight
-        for y in range(image_height_out):
-            for x in range(image_width_out):
-                for y_kernel in range(kernel_height):
-                    for x_kernel in range(kernel_width):
-                        this_pixel = image[batch_size, channels_in, y * stride + kernel_height, x * stride + kernel_width]
-                        this_weight = self.weight[channels_out, channels_in, kernel_height, kernel_width]
+        for b in range(batch_size):
+            for c_in in range(channels_in):
+                for c_out in range(channels_out):
+                    for y in range(image_height_out):
+                        for x in range(image_width_out):
+                            for y_kernel in range(kernel_height):
+                                for x_kernel in range(kernel_width):
+                                    this_pixel = image[b, c_in, y * stride + y_kernel, x * stride + x_kernel]
+                                    this_weight = self.weight[c_out, c_in, y_kernel, x_kernel]
 
-                        out[batch_size, channels_out, y, x] += np.sum(this_pixel * this_weight)
+                                    out[b, c_out, y, x] += np.sum(this_pixel * this_weight)
+
+        self.input = image
 
         return out
 
-    def back(self, image):
-        pass  # temporary hold
+    def backward(self, gradient):
+        # grabbing dimensions of the weight and gradient matrices
+        filter_index, channels_in, m, n = self.weight.shape
+        batch_size, channels_out, height_out, width_out = gradient.shape
 
+        # helper variables to give the input gradient matrix the same dimensions as the input matrix
+        b_s, ch_in, img_height, img_width = self.input.shape
+
+        # creates an empty matrix for the data to be saved
+        weight_grad = np.zeros(shape=(filter_index, channels_in, m, n), dtype=np.float32)
+        input_grad = np.zeros(shape=(b_s, ch_in, img_height, img_width), dtype=np.float32)
+
+        # iterates through the various pixels and adjusts it by the gradients to provide a weight gradient
+        for f in range(filter_index):
+            for c in range(channels_in):
+                for i in range(m):
+                    for j in range(n):
+                        for b in range(batch_size):
+                            for y in range(height_out):
+                                for x in range(width_out):
+                                    weight_grad[f, c, i, j] += self.input[b, c, y + i, x + j] * gradient[b, f, y, x]
+
+        # iterates through the weights and multiplies it to the weights in order to provide the gradient for the inputs
+        for f in range(filter_index):
+            for i in range(m):
+                for j in range(n):
+                    for b in range(batch_size):
+                        for c in range(channels_in):
+                            for y in range(height_out):
+                                for x in range(width_out):
+                                    input_grad[b, c, y + i, x + j] += np.sum(
+                                        gradient[b, f, y, x] * self.weight[f, c, i, j]
+                                    )
+
+        # padding the gradient input matrix
+        if self.pad != 0:
+            input_grad = input_grad[:, :, self.pad:-self.pad, self.pad:-self.pad]
+
+        return weight_grad, input_grad
 
 class MaxPool:
     def __init__(self):
