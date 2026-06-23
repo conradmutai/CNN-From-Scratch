@@ -87,6 +87,7 @@ class Conv2D:
 
         return weight_grad, input_grad
 
+
 class MaxPool:
     def __init__(self):
         self.input_shape = None
