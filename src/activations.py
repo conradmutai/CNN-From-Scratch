@@ -2,10 +2,7 @@ import numpy as np
 
 
 def relu(z):
-    if z > 0:
-        return z
-    else:
-        return 0
+    return np.maximum(0, z)
 
 
 def softmax(z, axis=-1):
@@ -14,5 +11,5 @@ def softmax(z, axis=-1):
 
 
 def sigmoid(z):
-    sig_z = 1 / (1 + np.exp(-1))
+    sig_z = 1 / (1 + np.exp(-z))
     return sig_z

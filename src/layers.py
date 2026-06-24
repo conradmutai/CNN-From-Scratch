@@ -1,8 +1,5 @@
 import numpy as np
 
-from .activations import relu
-
-
 class Conv2D:
     def __init__(self, weight, bias, input, pad=1):
         self.weight = weight
@@ -10,7 +7,7 @@ class Conv2D:
         self.input = input
         self.pad = pad
 
-    def forward(self, image, stride=1, pad=1):
+    def forward(self, image, stride=1):
         # padding the forward pass
         if self.pad != 0:
             image = np.pad(
@@ -41,51 +38,23 @@ class Conv2D:
                                     this_pixel = image[b, c_in, y * stride + y_kernel, x * stride + x_kernel]
                                     this_weight = self.weight[c_out, c_in, y_kernel, x_kernel]
 
-                                    out[b, c_out, y, x] += np.sum(this_pixel * this_weight)
+                                    out[b, c_out, y, x] += this_pixel * this_weight
 
         self.input = image
 
         return out
 
     def backward(self, gradient):
-        # grabbing dimensions of the weight and gradient matrices
-        filter_index, channels_in, m, n = self.weight.shape
-        batch_size, channels_out, height_out, width_out = gradient.shape
-
-        # helper variables to give the input gradient matrix the same dimensions as the input matrix
-        b_s, ch_in, img_height, img_width = self.input.shape
-
-        # creates an empty matrix for the data to be saved
-        weight_grad = np.zeros(shape=(filter_index, channels_in, m, n), dtype=np.float32)
-        input_grad = np.zeros(shape=(b_s, ch_in, img_height, img_width), dtype=np.float32)
-
-        # iterates through the various pixels and adjusts it by the gradients to provide a weight gradient
-        for f in range(filter_index):
-            for c in range(channels_in):
-                for i in range(m):
-                    for j in range(n):
-                        for b in range(batch_size):
-                            for y in range(height_out):
-                                for x in range(width_out):
-                                    weight_grad[f, c, i, j] += self.input[b, c, y + i, x + j] * gradient[b, f, y, x]
-
-        # iterates through the weights and multiplies it to the weights in order to provide the gradient for the inputs
-        for f in range(filter_index):
-            for i in range(m):
-                for j in range(n):
-                    for b in range(batch_size):
-                        for c in range(channels_in):
-                            for y in range(height_out):
-                                for x in range(width_out):
-                                    input_grad[b, c, y + i, x + j] += np.sum(
-                                        gradient[b, f, y, x] * self.weight[f, c, i, j]
-                                    )
+        # sums the products of weight_grad, input_grad, and the gradient for bias_grad across the matrices
+        weight_grad = np.sum(self.input * gradient, axis=(0, 2, 3))
+        input_grad = np.sum(gradient * self.weight, axis=(0, 2, 3))
+        bias_grad = np.sum(gradient, axis=(0, 2, 3))
 
         # padding the gradient input matrix
         if self.pad != 0:
             input_grad = input_grad[:, :, self.pad:-self.pad, self.pad:-self.pad]
 
-        return weight_grad, input_grad
+        return weight_grad, bias_grad, input_grad
 
 
 class MaxPool:
@@ -165,7 +134,7 @@ class FullyConnected:
 
     def forward(self, image):
         self.input = image
-        return relu(image @ self.weight + self.bias)
+        return image @ self.weight + self.bias
 
     def backward(self, grad_output):
         # grad_output: dL/d(output of this layer), shape = (batch, out_features)
@@ -189,8 +158,6 @@ class BatchNorm2D:
         self.beta = beta
         self.gamma = gamma
         self.sigma = sigma
-        self.x_hat_i = x_hat_i
-        self.s_h = s_h
 
     def forward(self, image):
         batch_size, channels_in, image_height, image_width = image.shape
@@ -218,13 +185,9 @@ class BatchNorm2D:
 
                         h[b, c, y, x] = self.gamma[c] * x_hat_i + self.beta
 
-        # UPDATES X_HAT_I AND S_H
-        self.x_hat_i = x_hat
-        self.s_h = s_h_all
-
         return h
 
-    def backward(self, gradient):
+    def backward(self, gradient, x_hat_i, s_h):
         # assigns these variables to the size of batches, number of channels, height of the image, and width of the image
         batch_size, channels_in, image_height, image_width = gradient.shape
 
@@ -232,12 +195,12 @@ class BatchNorm2D:
         m = batch_size * image_height * image_width
 
         beta_grad = np.sum(gradient, axis=(0, 2, 3))  # calculates the beta gradient by summing gradient
-        gamma_grad = np.sum(gradient*self.x_hat_i, axis=(0, 2, 3))  # calculates the sum of the gradient times the hidden unit output
+        gamma_grad = np.sum(gradient*x_hat_i, axis=(0, 2, 3))  # calculates the sum of the gradient times the hidden unit output
         x_hat_grad = gradient * self.gamma.reshape(1, channels_in, 1, 1)  # calculates the gradient of the hidden unit outputs
         sum_x_hat_grad = np.sum(x_hat_grad, axis=(0, 2, 3))  # sums the hidden unit output gradients
-        sum_x_hat_grad_xhat = np.sum(x_hat_grad * self.x_hat_i, axis=(0, 2, 3))  # multiplies the sum of hidden unit gradients by the gradient
+        sum_x_hat_grad_xhat = np.sum(x_hat_grad * x_hat_i, axis=(0, 2, 3))  # multiplies the sum of hidden unit gradients by the gradient
 
-        x_out = 1/(m*self.s_h) * (m * x_hat_grad - sum_x_hat_grad.reshape(1, channels_in, 1, 1) - (self.x_hat_i * sum_x_hat_grad_xhat.reshape(1, channels_in, 1, 1)))
+        x_out = 1/(m*s_h.reshape(1, channels_in, 1, 1)) * (m * x_hat_grad - sum_x_hat_grad.reshape(1, channels_in, 1, 1) - (x_hat_i * sum_x_hat_grad_xhat.reshape(1, channels_in, 1, 1)))
 
         return x_out, gamma_grad, beta_grad
 
