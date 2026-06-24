@@ -13,11 +13,26 @@ class SGD:  # stochastic gradient descent
 
 
 class Adam:
-    def __init__(self, weights, learning_rate):
+    def __init__(self, weights, learning_rate, beta1=0.9, beta2=0.999, epsilon=1e-8):
         self.weights = weights
         self.lr = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
 
-    def step(self, weight_grad, epsilon=0.05):
-        square_gradient = np.square(weight_grad)
-        self.weights = self.weights - self.lr * (weight_grad/(square_gradient + epsilon))
+        self.m = self.weights.shape[2]
+        self.v = self.weights.shape[3]
+        self.t = 0
+
+    def step(self, weight_grad):
+        self.t += 1
+
+        self.m = self.beta1 * self.m + ((1 - self.beta1) * weight_grad)
+        self.v = self.beta2 * self.v + ((1 - self.beta2) * weight_grad**2)
+
+        m_hat = 1/(self.beta1**self.t)
+        v_hat = 1/(self.beta2**self.t)
+
+        self.weights = self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
+
         return self.weights

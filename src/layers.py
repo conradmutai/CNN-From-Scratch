@@ -28,29 +28,55 @@ class Conv2D:
         out = np.zeros(shape=(batch_size, channels_out, image_height_out, image_width_out), dtype=np.float32)
 
         # iterates through all the elements of the image matrix to calculate the sum of the pixels multiplied by weight
-        for b in range(batch_size):
-            for c_in in range(channels_in):
-                for c_out in range(channels_out):
-                    for y in range(image_height_out):
-                        for x in range(image_width_out):
-                            for y_kernel in range(kernel_height):
-                                for x_kernel in range(kernel_width):
-                                    this_pixel = image[b, c_in, y * stride + y_kernel, x * stride + x_kernel]
-                                    this_weight = self.weight[c_out, c_in, y_kernel, x_kernel]
+        for y_kernel in range(kernel_height):
+            for x_kernel in range(kernel_width):
+                # slice of the image aligned with the output grid, for this kernel offset
+                image_slice = image[
+                              :, :,
+                              y_kernel: y_kernel + image_height_out * stride: stride,
+                              x_kernel: x_kernel + image_width_out * stride: stride
+                              ]  # shape: (batch, channels_in, height_out, width_out)
 
-                                    out[b, c_out, y, x] += this_pixel * this_weight
+                weight_slice = self.weight[:, :, y_kernel, x_kernel]  # shape: (channels_out, channels_in)
+
+                # contract over channels_in, broadcast over batch/spatial
+                out += np.einsum('bcyx,fc->bfyx', image_slice, weight_slice)
 
         self.input = image
 
         return out
 
     def backward(self, gradient):
-        # sums the products of weight_grad, input_grad, and the gradient for bias_grad across the matrices
-        weight_grad = np.sum(self.input * gradient, axis=(0, 2, 3))
-        input_grad = np.sum(gradient * self.weight, axis=(0, 2, 3))
+        filter_index, channels_in, m, n = self.weight.shape
+        batch_size, channels_out, height_out, width_out = gradient.shape
+
+        b_s, ch_in, img_height, img_width = self.input.shape
+
+        weight_grad = np.zeros(shape=(filter_index, channels_in, m, n), dtype=np.float32)
+        input_grad = np.zeros(shape=(b_s, ch_in, img_height, img_width), dtype=np.float32)
         bias_grad = np.sum(gradient, axis=(0, 2, 3))
 
-        # padding the gradient input matrix
+        stride = 1  # update this if you ever pass a non-default stride into forward
+
+        for i in range(m):
+            for j in range(n):
+                # slice of self.input aligned with the output grid, for this kernel offset
+                input_slice = self.input[
+                              :, :,
+                              i: i + height_out * stride: stride,
+                              j: j + width_out * stride: stride
+                              ]  # shape: (batch, channels_in, height_out, width_out)
+
+                # weight_grad[:, :, i, j]: contract over batch + spatial, keep channels_out and channels_in separate
+                weight_grad[:, :, i, j] = np.einsum('bcyx,bfyx->fc', input_slice, gradient)
+
+                # input_grad contribution for this kernel offset: contract over channels_out, scatter into the right spatial slice
+                input_grad[
+                    :, :,
+                    i: i + height_out * stride: stride,
+                    j: j + width_out * stride: stride
+                ] += np.einsum('bfyx,fc->bcyx', gradient, self.weight[:, :, i, j])
+
         if self.pad != 0:
             input_grad = input_grad[:, :, self.pad:-self.pad, self.pad:-self.pad]
 
@@ -139,10 +165,6 @@ class FullyConnected:
     def backward(self, grad_output):
         # grad_output: dL/d(output of this layer), shape = (batch, out_features)
 
-        # Backprop through ReLU
-        relu_mask = (self.input @ self.weight + self.bias) > 0  # creates a boolean value
-        grad_output = grad_output * relu_mask
-
         # Gradients w.r.t. parameters
         self.grad_weight = self.input.T @ grad_output
         self.grad_bias = np.sum(grad_output, axis=0)
@@ -153,7 +175,7 @@ class FullyConnected:
 
 
 class BatchNorm2D:
-    def __init__(self, epsilon, beta, gamma, sigma, x_hat_i, s_h):
+    def __init__(self, epsilon, beta, gamma, sigma):
         self.epsilon = epsilon
         self.beta = beta
         self.gamma = gamma
@@ -183,9 +205,9 @@ class BatchNorm2D:
                         x_hat_i = (image[b, c, y, x] - m_h) / (s_h + self.epsilon)
                         x_hat[b, c, y, x] = x_hat_i  # stores the x_hat inside its matrix store
 
-                        h[b, c, y, x] = self.gamma[c] * x_hat_i + self.beta
+                        h[b, c, y, x] = self.gamma[c] * x_hat_i + self.beta[c]
 
-        return h
+        return h, x_hat, s_h_all
 
     def backward(self, gradient, x_hat_i, s_h):
         # assigns these variables to the size of batches, number of channels, height of the image, and width of the image
