@@ -1,10 +1,15 @@
 import numpy as np
 
+
 class Conv2D:
-    def __init__(self, weight, bias, input, pad=1):
+    def __init__(self, weight, bias, input, weight_optimizer, bias_optimizer, weight_grad, bias_grad, pad=1):
         self.weight = weight
         self.bias = bias
         self.input = input
+        self.weight_optimizer = weight_optimizer
+        self.bias_optimizer = bias_optimizer
+        self.weight_grad = weight_grad
+        self.bias_grad = bias_grad
         self.pad = pad
 
     def forward(self, image, stride=1):
@@ -80,7 +85,14 @@ class Conv2D:
         if self.pad != 0:
             input_grad = input_grad[:, :, self.pad:-self.pad, self.pad:-self.pad]
 
+        self.weight_grad = weight_grad
+        self.bias_grad = bias_grad
+
         return weight_grad, bias_grad, input_grad
+
+    def update(self):
+        self.weight = self.weight_optimizer.step(self.weight_grad)
+        self.bias = self.bias_optimizer.step(self.bias_grad)
 
 
 class MaxPool:
@@ -134,6 +146,9 @@ class MaxPool:
 
         return loss_out
 
+    def update(self):
+        pass
+
 
 class Flatten:
     def __init__(self):
@@ -149,14 +164,19 @@ class Flatten:
     def backward(self, grad_output):
         return grad_output.reshape(self.input_shape)
 
+    def update(self):
+        pass
+
 
 class FullyConnected:
-    def __init__(self, weight, bias):
+    def __init__(self, weight, bias, weight_optimizer, bias_optimizer):
         self.grad_bias = None
         self.grad_weight = None
         self.input = None
         self.weight = weight
         self.bias = bias
+        self.weight_optimizer = weight_optimizer
+        self.bias_optimizer = bias_optimizer
 
     def forward(self, image):
         self.input = image
@@ -173,13 +193,21 @@ class FullyConnected:
         grad_input = grad_output @ self.weight.T
         return grad_input
 
+    def update(self):
+        self.weight = self.weight_optimizer.step(self.grad_weight)
+        self.bias = self.bias_optimizer.step(self.grad_bias)
+
 
 class BatchNorm2D:
-    def __init__(self, epsilon, beta, gamma, sigma):
+    def __init__(self, epsilon, beta, gamma, sigma, gamma_grad, beta_grad, gamma_optimizer, beta_optimizer):
         self.epsilon = epsilon
         self.beta = beta
         self.gamma = gamma
         self.sigma = sigma
+        self.gamma_grad = gamma_grad
+        self.beta_grad = beta_grad
+        self.gamma_optimizer = gamma_optimizer
+        self.beta_optimizer = beta_optimizer
 
     def forward(self, image):
         batch_size, channels_in, image_height, image_width = image.shape
@@ -224,6 +252,13 @@ class BatchNorm2D:
 
         x_out = 1/(m*s_h.reshape(1, channels_in, 1, 1)) * (m * x_hat_grad - sum_x_hat_grad.reshape(1, channels_in, 1, 1) - (x_hat_i * sum_x_hat_grad_xhat.reshape(1, channels_in, 1, 1)))
 
+        self.gamma_grad = gamma_grad
+        self.beta_grad = beta_grad
+
         return x_out, gamma_grad, beta_grad
+
+    def update(self):
+        self.gamma = self.gamma_optimizer.step(self.gamma_grad)
+        self.beta = self.beta_optimizer.step(self.beta_grad)
 
 

@@ -20,8 +20,8 @@ class Adam:
         self.beta2 = beta2
         self.epsilon = epsilon
 
-        self.m = self.weights.shape[2]
-        self.v = self.weights.shape[3]
+        self.m = np.zeros_like(self.weights)
+        self.v = np.zeros_like(self.weights)
         self.t = 0
 
     def step(self, weight_grad):
@@ -30,8 +30,8 @@ class Adam:
         self.m = self.beta1 * self.m + ((1 - self.beta1) * weight_grad)
         self.v = self.beta2 * self.v + ((1 - self.beta2) * weight_grad**2)
 
-        m_hat = 1/(self.beta1**self.t)
-        v_hat = 1/(self.beta2**self.t)
+        m_hat = 1/(self.beta1**self.t) * self.m
+        v_hat = 1/(self.beta2**self.t) * self.v
 
         self.weights = self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
