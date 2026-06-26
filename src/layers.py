@@ -1,15 +1,16 @@
 import numpy as np
 
+from .activations import relu, softmax
 
 class Conv2D:
-    def __init__(self, weight, bias, input, weight_optimizer, bias_optimizer, weight_grad, bias_grad, pad=1):
+    def __init__(self, weight, bias, image, weight_optimizer, bias_optimizer, pad=1):
         self.weight = weight
         self.bias = bias
-        self.input = input
+        self.input = image
         self.weight_optimizer = weight_optimizer
         self.bias_optimizer = bias_optimizer
-        self.weight_grad = weight_grad
-        self.bias_grad = bias_grad
+        self.weight_grad = None
+        self.bias_grad = None
         self.pad = pad
 
     def forward(self, image, stride=1):
@@ -94,6 +95,9 @@ class Conv2D:
         self.weight = self.weight_optimizer.step(self.weight_grad)
         self.bias = self.bias_optimizer.step(self.bias_grad)
 
+    def relu(self):
+        pass
+
 
 class MaxPool:
     def __init__(self):
@@ -142,12 +146,15 @@ class MaxPool:
                     for j in range(width_out):
                         loss_out[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] += (
                                 self.mask[b, c, i * 2:i * 2 + 2, j * 2:j * 2 + 2] * loss[b, c, i, j]
-                        ) # sets the loss out matrix max from the mask values obtained
+                        )  # sets the loss out matrix max from the mask values obtained
 
         return loss_out
 
     def update(self):
         pass
+
+    def relu_act(self):
+        relu()
 
 
 class Flatten:
@@ -200,6 +207,8 @@ class FullyConnected:
 
 class BatchNorm2D:
     def __init__(self, epsilon, beta, gamma, sigma, gamma_grad, beta_grad, gamma_optimizer, beta_optimizer):
+        self.s_h = None
+        self.x_hat = None
         self.epsilon = epsilon
         self.beta = beta
         self.gamma = gamma
@@ -235,9 +244,12 @@ class BatchNorm2D:
 
                         h[b, c, y, x] = self.gamma[c] * x_hat_i + self.beta[c]
 
-        return h, x_hat, s_h_all
+        self.x_hat = x_hat
+        self.s_h = s_h_all
 
-    def backward(self, gradient, x_hat_i, s_h):
+        return h
+
+    def backward(self, gradient):
         # assigns these variables to the size of batches, number of channels, height of the image, and width of the image
         batch_size, channels_in, image_height, image_width = gradient.shape
 
@@ -245,20 +257,34 @@ class BatchNorm2D:
         m = batch_size * image_height * image_width
 
         beta_grad = np.sum(gradient, axis=(0, 2, 3))  # calculates the beta gradient by summing gradient
-        gamma_grad = np.sum(gradient*x_hat_i, axis=(0, 2, 3))  # calculates the sum of the gradient times the hidden unit output
+        gamma_grad = np.sum(gradient*self.x_hat, axis=(0, 2, 3))  # calculates the sum of the gradient times the hidden unit output
         x_hat_grad = gradient * self.gamma.reshape(1, channels_in, 1, 1)  # calculates the gradient of the hidden unit outputs
         sum_x_hat_grad = np.sum(x_hat_grad, axis=(0, 2, 3))  # sums the hidden unit output gradients
-        sum_x_hat_grad_xhat = np.sum(x_hat_grad * x_hat_i, axis=(0, 2, 3))  # multiplies the sum of hidden unit gradients by the gradient
+        sum_x_hat_grad_x_hat = np.sum(x_hat_grad * self.x_hat, axis=(0, 2, 3))  # multiplies the sum of hidden unit gradients by the gradient
 
-        x_out = 1/(m*s_h.reshape(1, channels_in, 1, 1)) * (m * x_hat_grad - sum_x_hat_grad.reshape(1, channels_in, 1, 1) - (x_hat_i * sum_x_hat_grad_xhat.reshape(1, channels_in, 1, 1)))
+        x_out = 1/(m*self.s_h.reshape(1, channels_in, 1, 1)) * (m * x_hat_grad - sum_x_hat_grad.reshape(1, channels_in, 1, 1) - (self.x_hat * sum_x_hat_grad_x_hat.reshape(1, channels_in, 1, 1)))
 
         self.gamma_grad = gamma_grad
         self.beta_grad = beta_grad
 
-        return x_out, gamma_grad, beta_grad
+        return x_out
 
     def update(self):
         self.gamma = self.gamma_optimizer.step(self.gamma_grad)
         self.beta = self.beta_optimizer.step(self.beta_grad)
 
 
+class ReLU:
+    def __init__(self):
+        self.input = None
+
+    def forward(self, x):
+        self.input = x
+        return relu(self.input)
+
+    def backward(self, grad_output):
+        grad_input = grad_output * (1 if self.input > 0 else 0)
+        return grad_input
+
+    def update(self):
+        pass

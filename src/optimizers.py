@@ -33,6 +33,6 @@ class Adam:
         m_hat = 1/(self.beta1**self.t) * self.m
         v_hat = 1/(self.beta2**self.t) * self.v
 
-        self.weights = self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
+        self.weights = self.weights - self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
 
         return self.weights
