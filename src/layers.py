@@ -2,6 +2,7 @@ import numpy as np
 
 from .activations import relu, softmax
 
+
 class Conv2D:
     def __init__(self, weight, bias, image, weight_optimizer, bias_optimizer, pad=1):
         self.weight = weight
@@ -89,14 +90,11 @@ class Conv2D:
         self.weight_grad = weight_grad
         self.bias_grad = bias_grad
 
-        return weight_grad, bias_grad, input_grad
+        return input_grad
 
     def update(self):
         self.weight = self.weight_optimizer.step(self.weight_grad)
         self.bias = self.bias_optimizer.step(self.bias_grad)
-
-    def relu(self):
-        pass
 
 
 class MaxPool:
@@ -152,9 +150,6 @@ class MaxPool:
 
     def update(self):
         pass
-
-    def relu_act(self):
-        relu()
 
 
 class Flatten:
@@ -283,7 +278,7 @@ class ReLU:
         return relu(self.input)
 
     def backward(self, grad_output):
-        grad_input = grad_output * (1 if self.input > 0 else 0)
+        grad_input = grad_output * (self.input > 0)
         return grad_input
 
     def update(self):
