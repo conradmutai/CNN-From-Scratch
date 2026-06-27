@@ -94,7 +94,27 @@ for e in range(epochs):  # looping over the epochs
         true_classes = np.argmax(y_train[b * batch_size: (b + 1) * batch_size], axis=1)
         accuracy = np.mean(predicted_classes == true_classes)
 
-        print(f"epoch: {e+1},   batch: {b},   accuracy: {round(accuracy, 3)},   loss: {round(loss,3)},   grad: {round(np.max(np.abs(grad)), 3)}")
+        print(f"epoch: {e+1},   batch: {b},   training accuracy: {round(accuracy, 3)},   loss: {round(loss,3)},   grad: {round(np.max(np.abs(grad)), 3)}")
+
+total_correct = 0
+total_seen = 0
+
+num_test_batch = len(x_test) // batch_size
+
+for b in range(num_test_batch):
+    test_batch_image = x_test[b*batch_size: (b+1)*batch_size]
+    test_batch_labels = y_test[b*batch_size: (b+1)*batch_size]
+
+    predictions = model.forward(test_batch_image)
+    probs = softmax(predictions)
+    predicted_classes = np.argmax(probs, axis=1)
+    true_classes = np.argmax(test_batch_labels, axis=1)
+    total_correct += np.sum(predicted_classes == true_classes)
+    total_seen += batch_size
+
+    test_accuracy = total_correct / total_seen
+
+    print(f"test accuracy: {test_accuracy}")
 
 
 

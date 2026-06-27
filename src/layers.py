@@ -286,7 +286,7 @@ class ReLU:
 
 
 # helper function to aid with gradient clipping
-def clip_gradient(grad, max_norm=1.0):
+def clip_gradient(grad, max_norm=5.0):
     norm = np.linalg.norm(grad)
     if norm > max_norm:
         grad = grad * (max_norm/norm)
