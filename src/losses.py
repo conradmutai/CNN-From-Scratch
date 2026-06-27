@@ -1,10 +1,10 @@
 import numpy as np
 
 
-def cross_entropy_loss(actual_y, predicted_y):
+def cross_entropy_loss(actual_y, predicted_y, batch_size):
     epsilon = 1e-12
     predicted_y = np.clip(predicted_y, epsilon, 1 - epsilon)
-    return -np.sum(actual_y * np.log(predicted_y))
+    return -np.sum(actual_y * np.log(predicted_y)) / batch_size
 
 
 def gradient_loss(weight, d_loss, d_weight, learning_rate):

@@ -87,8 +87,8 @@ class Conv2D:
         if self.pad != 0:
             input_grad = input_grad[:, :, self.pad:-self.pad, self.pad:-self.pad]
 
-        self.weight_grad = weight_grad
-        self.bias_grad = bias_grad
+        self.weight_grad = clip_gradient(weight_grad)
+        self.bias_grad = clip_gradient(bias_grad)
 
         return input_grad
 
@@ -188,8 +188,8 @@ class FullyConnected:
         # grad_output: dL/d(output of this layer), shape = (batch, out_features)
 
         # Gradients w.r.t. parameters
-        self.grad_weight = self.input.T @ grad_output
-        self.grad_bias = np.sum(grad_output, axis=0)
+        self.grad_weight = clip_gradient(self.input.T @ grad_output)
+        self.grad_bias = clip_gradient(np.sum(grad_output, axis=0))
 
         # Gradient to pass to the previous layer
         grad_input = grad_output @ self.weight.T
@@ -259,8 +259,8 @@ class BatchNorm2D:
 
         x_out = 1/(m*self.s_h.reshape(1, channels_in, 1, 1)) * (m * x_hat_grad - sum_x_hat_grad.reshape(1, channels_in, 1, 1) - (self.x_hat * sum_x_hat_grad_x_hat.reshape(1, channels_in, 1, 1)))
 
-        self.gamma_grad = gamma_grad
-        self.beta_grad = beta_grad
+        self.gamma_grad = clip_gradient(gamma_grad)
+        self.beta_grad = clip_gradient(beta_grad)
 
         return x_out
 
@@ -283,3 +283,12 @@ class ReLU:
 
     def update(self):
         pass
+
+
+# helper function to aid with gradient clipping
+def clip_gradient(grad, max_norm=1.0):
+    norm = np.linalg.norm(grad)
+    if norm > max_norm:
+        grad = grad * (max_norm/norm)
+    return grad
+
