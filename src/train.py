@@ -23,7 +23,7 @@ gamma1_optimizer = Adam(gamma1)
 beta1_optimizer = Adam(beta1)
 
 conv1 = Conv2D(weight1, bias1, None, weight1_optimizer, bias1_optimizer)  # convolutional layer
-batchnorm1 = BatchNorm2D(epsilon=1e-5, beta=beta1, gamma=gamma1, sigma=None, gamma_grad=None, beta_grad=None, gamma_optimizer=gamma1_optimizer, beta_optimizer=beta1_optimizer)
+batchnorm1 = BatchNorm2D(epsilon=1e-5, beta=beta1, gamma=gamma1, gamma_optimizer=gamma1_optimizer, beta_optimizer=beta1_optimizer)
 relu1 = ReLU()
 maxpool1 = MaxPool()
 
@@ -41,7 +41,7 @@ gamma2_optimizer = Adam(gamma2)
 beta2_optimizer = Adam(beta2)
 
 conv2 = Conv2D(weight2, bias2, None, weight2_optimizer, bias2_optimizer)
-batchnorm2 = BatchNorm2D(epsilon=1e-5, beta=beta2, gamma=gamma2, sigma=None, gamma_grad=None, beta_grad=None, gamma_optimizer=gamma2_optimizer, beta_optimizer=beta2_optimizer)
+batchnorm2 = BatchNorm2D(epsilon=1e-5, beta=beta2, gamma=gamma2, gamma_optimizer=gamma2_optimizer, beta_optimizer=beta2_optimizer)
 relu2 = ReLU()
 maxpool2 = MaxPool()
 
@@ -56,65 +56,61 @@ bias3_optimizer = Adam(bias3)
 fc = FullyConnected(weight3, bias3, weight3_optimizer, bias3_optimizer)
 
 # gathering the data for MNIST and assigning it to variables
-mnist =  fetch_openml('mnist_784', version=1, as_frame=False)
+mnist = fetch_openml('mnist_784', version=1, as_frame=False)
 
-x_train = mnist.data[:2500].reshape(2500, 1, 28, 28)  # temp change to 5000 for the sake of testing
-x_train = x_train / 255.0
-y_train = mnist.target[:2500].astype(int)
-y_train = np.eye(10)[y_train]
 
-x_test = mnist.data[60000:].reshape(-1, 1, 28, 28)
-x_test = x_test / 255.0
-y_test = mnist.target[60000:].astype(int)
-y_test = np.eye(10)[y_test]
+def train(x_train, y_train, x_test, y_test, epochs, learning_rate):
+    # Creating the layers
+    layers = [conv1, batchnorm1, relu1, maxpool1, conv2, batchnorm2, relu2, maxpool2, flatten, fc]
 
-# Creating the layers
-layers = [conv1, batchnorm1, relu1, maxpool1, conv2, batchnorm2, relu2, maxpool2, flatten, fc]
+    model = Model(layers)
 
-model = Model(layers)
+    batch_size = 32
 
-epochs = 3
-batch_size = 32
+    num_batches = len(x_train) // batch_size  # 32 is the batch size
 
-num_batches = len(x_train) // batch_size  # 32 is the batch size
+    for e in range(epochs):  # looping over the epochs
+        for b in range(num_batches):  # goes over the batches
+            # forward prop
+            predictions = model.forward(x_train[b*batch_size: (b+1)*batch_size])
+            probs = softmax(predictions)
 
-for e in range(epochs):  # looping over the epochs
-    for b in range(num_batches):  # goes over the batches
-        # forward prop
-        predictions = model.forward(x_train[b*batch_size: (b+1)*batch_size])
+            # backward prop
+            loss = cross_entropy_loss(y_train[b*batch_size: (b+1)*batch_size], probs, batch_size)
+            grad = probs - y_train[b*batch_size: (b+1)*batch_size]
+            model.backward(grad)
+            model.update()
+
+            predicted_classes = np.argmax(probs, axis=1)
+            true_classes = np.argmax(y_train[b * batch_size: (b + 1) * batch_size], axis=1)
+            accuracy = np.mean(predicted_classes == true_classes)
+
+            print(f"epoch: {e+1},   batch: {b},   training accuracy: {round(accuracy, 3)},   loss: {round(loss,3)},   grad: {round(np.max(np.abs(grad)), 3)}")
+
+    total_correct = 0
+    total_seen = 0
+
+    num_test_batch = len(x_test) // batch_size
+
+    for b in range(num_test_batch):
+        test_batch_image = x_test[b*batch_size: (b+1)*batch_size]
+        test_batch_labels = y_test[b*batch_size: (b+1)*batch_size]
+
+        predictions = model.forward(test_batch_image)
         probs = softmax(predictions)
-
-        # backward prop
-        loss = cross_entropy_loss(y_train[b*batch_size: (b+1)*batch_size], probs, batch_size)
-        grad = probs - y_train[b*batch_size: (b+1)*batch_size]
-        model.backward(grad)
-        model.update()
-
         predicted_classes = np.argmax(probs, axis=1)
-        true_classes = np.argmax(y_train[b * batch_size: (b + 1) * batch_size], axis=1)
-        accuracy = np.mean(predicted_classes == true_classes)
+        true_classes = np.argmax(test_batch_labels, axis=1)
+        total_correct += np.sum(predicted_classes == true_classes)
+        total_seen += batch_size
 
-        print(f"epoch: {e+1},   batch: {b},   training accuracy: {round(accuracy, 3)},   loss: {round(loss,3)},   grad: {round(np.max(np.abs(grad)), 3)}")
+        test_accuracy = total_correct / total_seen
 
-total_correct = 0
-total_seen = 0
+        print(f"test accuracy: {test_accuracy}")
 
-num_test_batch = len(x_test) // batch_size
 
-for b in range(num_test_batch):
-    test_batch_image = x_test[b*batch_size: (b+1)*batch_size]
-    test_batch_labels = y_test[b*batch_size: (b+1)*batch_size]
-
-    predictions = model.forward(test_batch_image)
-    probs = softmax(predictions)
-    predicted_classes = np.argmax(probs, axis=1)
-    true_classes = np.argmax(test_batch_labels, axis=1)
-    total_correct += np.sum(predicted_classes == true_classes)
-    total_seen += batch_size
-
-    test_accuracy = total_correct / total_seen
-
-    print(f"test accuracy: {test_accuracy}")
-
+def one_hot(labels, num_classes):
+    one_hot_labels = np.zeros((labels.shape[0], num_classes))
+    one_hot_labels[np.arange(labels.shape[0]), labels] = 1
+    return one_hot_labels
 
 
