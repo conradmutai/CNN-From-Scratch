@@ -59,7 +59,7 @@ fc = FullyConnected(weight3, bias3, weight3_optimizer, bias3_optimizer)
 mnist = fetch_openml('mnist_784', version=1, as_frame=False)
 
 
-def train(x_train, y_train, x_test, y_test, epochs, learning_rate):
+def train(x_train, y_train, x_test, y_test, epochs):
     # Creating the layers
     layers = [conv1, batchnorm1, relu1, maxpool1, conv2, batchnorm2, relu2, maxpool2, flatten, fc]
 
@@ -69,7 +69,13 @@ def train(x_train, y_train, x_test, y_test, epochs, learning_rate):
 
     num_batches = len(x_train) // batch_size  # 32 is the batch size
 
+    loss_history = []  # a list containing the losses per each epoch
+    train_acc_history = []  # a list containing the accuracy per each epoch
+
     for e in range(epochs):  # looping over the epochs
+        epoch_losses = []
+        epoch_accs = []
+
         for b in range(num_batches):  # goes over the batches
             # forward prop
             predictions = model.forward(x_train[b*batch_size: (b+1)*batch_size])
@@ -85,7 +91,17 @@ def train(x_train, y_train, x_test, y_test, epochs, learning_rate):
             true_classes = np.argmax(y_train[b * batch_size: (b + 1) * batch_size], axis=1)
             accuracy = np.mean(predicted_classes == true_classes)
 
-            print(f"epoch: {e+1},   batch: {b},   training accuracy: {round(accuracy, 3)},   loss: {round(loss,3)},   grad: {round(np.max(np.abs(grad)), 3)}")
+            epoch_losses.append(loss)
+            epoch_accs.append(accuracy)
+
+        loss_history.append(np.mean(epoch_losses))
+        train_acc_history.append(np.mean(epoch_accs))
+        print(f"epoch: {e + 1}   loss: {round(np.mean(epoch_losses), 3)}   train acc: {round(np.mean(epoch_accs), 3)}")
+
+    # switching the batch norm into test phase to allow proper passes through the CNN
+    for layer in model.layers:
+        if isinstance(layer, BatchNorm2D):
+            layer.training = False
 
     total_correct = 0
     total_seen = 0
@@ -103,9 +119,10 @@ def train(x_train, y_train, x_test, y_test, epochs, learning_rate):
         total_correct += np.sum(predicted_classes == true_classes)
         total_seen += batch_size
 
-        test_accuracy = total_correct / total_seen
+    test_accuracy = total_correct / total_seen
+    print(f"test accuracy: {test_accuracy}")
 
-        print(f"test accuracy: {test_accuracy}")
+    return loss_history, train_acc_history
 
 
 def one_hot(labels, num_classes):
