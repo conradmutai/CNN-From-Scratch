@@ -5,8 +5,8 @@ from sklearn.datasets import fetch_openml
 from .activations import softmax
 from .layers import Conv2D, ReLU, MaxPool, Flatten, FullyConnected, BatchNorm2D
 from .losses import cross_entropy_loss
-from .optimizers import Adam, SGD
-from .initializers import he_initialization, xavier_init
+from .optimizers import Adam
+from .initializers import xavier_init
 from .model import Model
 
 # Convolutional layer 1
@@ -59,11 +59,16 @@ fc = FullyConnected(weight3, bias3, weight3_optimizer, bias3_optimizer)
 mnist = fetch_openml('mnist_784', version=1, as_frame=False)
 
 
-def train(x_train, y_train, x_test, y_test, epochs):
+def train(x_train, y_train, epochs):
     # Creating the layers
     layers = [conv1, batchnorm1, relu1, maxpool1, conv2, batchnorm2, relu2, maxpool2, flatten, fc]
 
     model = Model(layers)
+
+    # make sure BatchNorm is in training mode in case test() was called before this
+    for layer in model.layers:
+        if isinstance(layer, BatchNorm2D):
+            layer.training = True
 
     batch_size = 32
 
@@ -71,58 +76,88 @@ def train(x_train, y_train, x_test, y_test, epochs):
 
     loss_history = []  # a list containing the losses per each epoch
     train_acc_history = []  # a list containing the accuracy per each epoch
+    predicted_classes_history = []
+    true_classes_history = []
 
     for e in range(epochs):  # looping over the epochs
+        # shuffle the training data each epoch
+        perm = np.random.permutation(len(x_train))
+        x_train_shuffled = x_train[perm]
+        y_train_shuffled = y_train[perm]
+
         epoch_losses = []
         epoch_accs = []
 
         for b in range(num_batches):  # goes over the batches
+            batch_x = x_train_shuffled[b*batch_size: (b+1)*batch_size]
+            batch_y = y_train_shuffled[b*batch_size: (b+1)*batch_size]
+
             # forward prop
-            predictions = model.forward(x_train[b*batch_size: (b+1)*batch_size])
+            predictions = model.forward(batch_x)
             probs = softmax(predictions)
 
             # backward prop
-            loss = cross_entropy_loss(y_train[b*batch_size: (b+1)*batch_size], probs, batch_size)
-            grad = probs - y_train[b*batch_size: (b+1)*batch_size]
+            loss = cross_entropy_loss(batch_y, probs, batch_size)
+            grad = probs - batch_y
             model.backward(grad)
             model.update()
 
             predicted_classes = np.argmax(probs, axis=1)
-            true_classes = np.argmax(y_train[b * batch_size: (b + 1) * batch_size], axis=1)
+            true_classes = np.argmax(batch_y, axis=1)
             accuracy = np.mean(predicted_classes == true_classes)
 
             epoch_losses.append(loss)
             epoch_accs.append(accuracy)
 
+            # only keep predictions from the final epoch, to avoid unbounded memory growth
+            if e == epochs - 1:
+                predicted_classes_history.append(predicted_classes)
+                true_classes_history.append(true_classes)
+
         loss_history.append(np.mean(epoch_losses))
         train_acc_history.append(np.mean(epoch_accs))
         print(f"epoch: {e + 1}   loss: {round(np.mean(epoch_losses), 3)}   train acc: {round(np.mean(epoch_accs), 3)}")
+
+    return loss_history, train_acc_history, predicted_classes_history, true_classes_history
+
+
+def test(x_test, y_test):
+    layers = [conv1, batchnorm1, relu1, maxpool1, conv2, batchnorm2, relu2, maxpool2, flatten, fc]
+    model = Model(layers)
+
+    batch_size = 32
 
     # switching the batch norm into test phase to allow proper passes through the CNN
     for layer in model.layers:
         if isinstance(layer, BatchNorm2D):
             layer.training = False
 
-    total_correct = 0
-    total_seen = 0
+    try:
+        total_correct = 0
+        total_seen = 0
 
-    num_test_batch = len(x_test) // batch_size
+        num_test_batch = len(x_test) // batch_size
 
-    for b in range(num_test_batch):
-        test_batch_image = x_test[b*batch_size: (b+1)*batch_size]
-        test_batch_labels = y_test[b*batch_size: (b+1)*batch_size]
+        for b in range(num_test_batch):
+            test_batch_image = x_test[b * batch_size: (b + 1) * batch_size]
+            test_batch_labels = y_test[b * batch_size: (b + 1) * batch_size]
 
-        predictions = model.forward(test_batch_image)
-        probs = softmax(predictions)
-        predicted_classes = np.argmax(probs, axis=1)
-        true_classes = np.argmax(test_batch_labels, axis=1)
-        total_correct += np.sum(predicted_classes == true_classes)
-        total_seen += batch_size
+            predictions = model.forward(test_batch_image)
+            probs = softmax(predictions)
+            predicted_classes = np.argmax(probs, axis=1)
+            true_classes = np.argmax(test_batch_labels, axis=1)
+            total_correct += np.sum(predicted_classes == true_classes)
+            total_seen += batch_size
 
-    test_accuracy = total_correct / total_seen
-    print(f"test accuracy: {test_accuracy}")
+        test_accuracy = total_correct / total_seen
+        print(f"test accuracy: {test_accuracy}")
 
-    return loss_history, train_acc_history
+        return test_accuracy
+    finally:
+        # always restore training mode, even if something above raises
+        for layer in model.layers:
+            if isinstance(layer, BatchNorm2D):
+                layer.training = True
 
 
 def one_hot(labels, num_classes):
