@@ -150,7 +150,8 @@ def test(x_test, y_test):
             total_seen += batch_size
 
         test_accuracy = total_correct / total_seen
-        print(f"test accuracy: {test_accuracy}")
+        test_accuracy_percentage = round(test_accuracy * 100, 3)
+        print(f"test accuracy: {test_accuracy_percentage}%")
 
         return test_accuracy
     finally:
