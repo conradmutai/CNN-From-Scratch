@@ -13,7 +13,9 @@ Test Accuracy and Train Accuracy in %, Loss in decimal.
 
 ### This Model
 Test Accuracy: 98%
+
 Train Accuracy (Highest): 100%
+
 Loss: 0.0
 
 ## Design Decisions
