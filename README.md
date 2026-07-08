@@ -19,7 +19,6 @@ A Convolutional Neural Network made with NumPy without the use of any external m
 To run this model, a demo notebook is attached and is opened through Jupyter Notebook. There's an option to "Run" at the top right, and selecting "Run All" will allow the model to run properly without any issues. As a warning, this model takes quite a while to train based on the system that's being used, as it isn't GPU-accelerated like libraries such as PyTorch.
 
 ## What I learned
-What I Learned
 I maintained a solid understanding of a Convolutional Neural Network, and the operation of kernel sizes that apply weights to selected hidden units of a previous layer, as well as what it means for a complete forward pass, but where I feel that I always lacked was the proper understanding of backpropagation, and specifically that for a CNN. It required me to go back and read how the operation of backprop works with this, and led to me having to differentiate different equations to get it working. It took trial and error, taking several days to resolve, and along the way I ran into several real bugs that forced me to actually understand what was happening rather than just accepting that the code worked. 
 
 One issue was a dead ReLU problem, where too many units stopped activating and just carried zero gradient forward. Another was my BatchNorm layer not properly storing running stats, which meant training looked fine but inference completely broke down. 
