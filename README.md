@@ -2,18 +2,24 @@
 Creating a CNN without the usage of core tensor libraries such as **PyTorch** or **TensorFlow**, while mainly utilizing **NumPy**. Implements forward pass, backpropagation, and gradient descent following essential principles.
 
 ## What This Is
-A Convolutional Neural Network made with NumPy without the use of any external machine learning libraries. This project was created as a display and test of my knowledge of rudimentary deep learning concepts, ranging from the basics, such as weight initialization, to the complexities of convolutional neural networks and backpropagation to achieve an optimal model loss. In addition, it will be benchmarked against a model made using PyTorch, with the MNIST dataset, which is commonly used in testing/benchmarking a model's efficiency, which in turn can lead to further development of the model.
+A Convolutional Neural Network made with NumPy without the use of any external machine learning libraries. This project was created as a display and test of my knowledge of rudimentary deep learning concepts, ranging from the basics, such as weight initialization, to the complexities of convolutional neural networks and backpropagation to achieve an optimal model loss. In addition, it will be benchmarked against a model built with PyTorch on the MNIST dataset, a dataset commonly used to test and benchmark model efficiency, which in turn can inform further development of the model.
 
 ## Architecture
-[ Conv2D -> ReLU -> MaxPool] * 3 -> Flatten -> FC -> Softmax
+[ Conv2D -> ReLU -> MaxPool] * 2 -> Flatten -> FC -> Softmax
 
 ## Results
 ### Metric
+Test Accuracy and Train Accuracy in %, Loss in decimal.
 
 ### This Model
+Test Accuracy: 98%
+Train Accuracy (Highest): 100%
+Loss: 0.0
 
 ## Design Decisions
-
+For the MNIST model, I chose to utilize:
+1 -> 32 -> 64: as MNIST images are quite simple, as they maintain themselves in a gray-scale low-detail format, the reason for doubling 32 to 64 is that it allows the second convolutional layer to combine the edge detectors from the first layer.
+64 -> 128: This is done after pooling, as once spatial resolution drops, increasing channels tends to compensate by capturing more patterns per spatial location, following the pattern used in CNN designs such as ResNet, where halving the resolution doubles the channels.
 
 ## How to Run
 To run this model, a demo notebook is attached and is opened through Jupyter Notebook. There's an option to "Run" at the top right, and selecting "Run All" will allow the model to run properly without any issues. As a warning, this model takes quite a while to train based on the system that's being used, as it isn't GPU-accelerated like libraries such as PyTorch.
