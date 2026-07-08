@@ -20,9 +20,12 @@ To run this model, a demo notebook is attached and is opened through Jupyter Not
 
 ## What I learned
 What I Learned
-I maintained a solid understanding of a Convolutional Neural Network, and the operation of kernel sizes that apply weights to selected hidden units of a previous layer, as well as what it means for a complete forward pass, but where I feel that I always lacked was the proper understanding of backpropagation, and specifically that for a CNN. It required me to go back and read how the operation of backprop works with this, and led to me having to differentiate different equations to get it working. It took trial and error, taking several days to resolve, and along the way I ran into several real bugs that forced me to actually understand what was happening rather than just accepting that the code worked.
+I maintained a solid understanding of a Convolutional Neural Network, and the operation of kernel sizes that apply weights to selected hidden units of a previous layer, as well as what it means for a complete forward pass, but where I feel that I always lacked was the proper understanding of backpropagation, and specifically that for a CNN. It required me to go back and read how the operation of backprop works with this, and led to me having to differentiate different equations to get it working. It took trial and error, taking several days to resolve, and along the way I ran into several real bugs that forced me to actually understand what was happening rather than just accepting that the code worked. 
+
 One issue was a dead ReLU problem, where too many units stopped activating and just carried zero gradient forward. Another was my BatchNorm layer not properly storing running stats, which meant training looked fine but inference completely broke down. 
+
 I also found that I had hardcoded stride=1 into my Conv2D backward pass without realizing it, which meant gradients were wrong for any layer using a different stride. The hardest one to catch was in my Adam optimizer, where I had written the bias correction as 1/(beta**t) instead of the correct formulation, which quietly skewed the whole training process without throwing any errors.
+
 At the end, I was able to come to a proper conclusion, having gone through backprop for a CNN by hand and fixed each of these issues individually.
 
 ## References
